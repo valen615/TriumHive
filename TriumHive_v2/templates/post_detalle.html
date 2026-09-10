@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block titulo %}{{ post.titulo }} · TriumHive{% endblock %}
+
+{% block contenido %}
+<article class="articulo-post" style="--color-categoria: {{ post.categoria.color }};">
+  <div class="articulo-post__banda"></div>
+  <div class="articulo-post__inner">
+    <span class="articulo-post__categoria">{{ post.categoria.icono }} {{ post.categoria.nombre }}</span>
+
+    <h1>{{ post.titulo }}</h1>
+
+    <div class="articulo-post__meta">
+      <a href="{{ url_for('perfil', username=post.autor.username) }}" class="tarjeta-post__autor">
+        <span class="avatar-inicial">
+          {% if post.autor.tiene_avatar %}
+            <img src="{{ url_for('uploaded_avatar', filename=post.autor.avatar_filename) }}"
+                 alt="{{ post.autor.iniciales }}">
+          {% else %}
+            {{ post.autor.iniciales }}
+          {% endif %}
+        </span>
+        <span>
+          <strong>{{ post.autor.nombre_completo or post.autor.username }}</strong>
+          {% if post.autor.es_admin %} <span class="badge-admin">Admin</span>{% endif %}
+          &nbsp;·&nbsp;
+          <time datetime="{{ post.fecha_creacion.isoformat() }}">
+            {{ post.fecha_creacion.strftime('%d de %B de %Y, %H:%M') }}
+          </time>
+        </span>
+      </a>
+
+      <button
+        type="button"
+        class="boton-like {% if post.ha_dado_like(current_user) %}esta-activo{% endif %}"
+        data-post-id="{{ post.id }}"
+        {% if not current_user.is_authenticated %}
+          data-requiere-login="true" data-login-url="{{ url_for('login') }}"
+        {% endif %}
+        aria-label="{% if post.ha_dado_like(current_user) %}Quitar me gusta{% else %}Dar me gusta{% endif %}"
+      >
+        <span class="icono-corazon">♥</span>
+        <span class="contador-likes">{{ post.total_likes }}</span>
+        &nbsp;Me gusta
+      </button>
+    </div>
+
+    <div class="articulo-post__contenido">{{ post.contenido }}</div>
+
+    {# Galería de imágenes adjuntas #}
+    {% set imagenes = post.adjuntos.filter_by(es_imagen=True).all() %}
+    {% if imagenes %}
+      <div class="galeria-adjuntos" role="list" aria-label="Imágenes adjuntas">
+        {% for img in imagenes %}
+          <img class="galeria-adjuntos__imagen"
+               src="{{ url_for('uploaded_post_file', filename=img.filename) }}"
+               alt="{{ img.original_name or 'Imagen adjunta' }}"
+               loading="lazy"
+               role="listitem"
+               data-lightbox="true">
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {# Archivos descargables #}
+    {% set archivos = post.adjuntos.filter_by(es_imagen=False).all() %}
+    {% if archivos %}
+      <div class="lista-adjuntos-archivo" role="list" aria-label="Archivos adjuntos">
+        {% for adj in archivos %}
+          <a class="adjunto-archivo"
+             href="{{ url_for('uploaded_post_file', filename=adj.filename) }}"
+             download="{{ adj.original_name or adj.filename }}"
+             role="listitem">
+            <span class="adjunto-archivo__icono">
+              {% if adj.filename.endswith('.pdf') %}📄
+              {% elif adj.filename.endswith(('.docx', '.doc')) %}📝
+              {% elif adj.filename.endswith(('.xlsx', '.xls')) %}📊
+              {% elif adj.filename.endswith('.zip') %}🗜️
+              {% else %}📎{% endif %}
+            </span>
+            <div class="adjunto-archivo__info">
+              <strong>{{ adj.original_name or adj.filename }}</strong>
+              <small>{{ adj.tamanio_legible }}</small>
+            </div>
+            <span style="margin-left:auto; font-size:var(--tam-xs); color:var(--color-texto-suave)">⬇ Descargar</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if current_user.is_authenticated and (current_user.id == post.autor_id or current_user.es_admin) %}
+      <div class="articulo-post__acciones-autor">
+        <a href="{{ url_for('editar_post', post_id=post.id) }}" class="boton boton-fantasma">✏️ Editar</a>
+        <form method="POST" action="{{ url_for('eliminar_post', post_id=post.id) }}"
+              onsubmit="return confirm('¿Seguro que deseas eliminar esta publicación? Esta acción no se puede deshacer.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="boton boton-peligro">🗑 Eliminar</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</article>
+
+<!-- Comentarios -->
+<section class="seccion-comentarios" id="comentarios">
+  <h2>💬 Comentarios <span style="font-weight:400;font-size:1rem;font-family:var(--fuente-cuerpo)">({{ post.total_comentarios }})</span></h2>
+
+  {% if current_user.is_authenticated %}
+    <form class="formulario-comentario" method="POST"
+          action="{{ url_for('comentar_post', post_id=post.id) }}">
+      {{ form_comentario.hidden_tag() }}
+      <span class="avatar-inicial" style="margin-top:4px">
+        {% if current_user.tiene_avatar %}
+          <img src="{{ url_for('uploaded_avatar', filename=current_user.avatar_filename) }}"
+               alt="{{ current_user.iniciales }}">
+        {% else %}
+          {{ current_user.iniciales }}
+        {% endif %}
+      </span>
+      <div class="campo-formulario" style="flex:1;margin:0">
+        {{ form_comentario.contenido(placeholder="Escribe un comentario respetuoso y constructivo…") }}
+        {% for error in form_comentario.contenido.errors %}
+          <div class="error-campo">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="boton boton-primario" style="align-self:flex-end">Comentar</button>
+    </form>
+  {% else %}
+    <p style="margin-bottom:var(--s6);color:var(--color-texto-suave);font-size:var(--tam-sm)">
+      <a href="{{ url_for('login') }}" style="color:var(--azul-600);font-weight:600">Inicia sesión</a> para dejar un comentario.
+    </p>
+  {% endif %}
+
+  {% if post.comentarios.count() > 0 %}
+    <ul class="lista-comentarios" role="list">
+      {% for comentario in post.comentarios %}
+        <li class="comentario" role="listitem">
+          <span class="avatar-inicial" style="margin-top:2px">
+            {% if comentario.autor.tiene_avatar %}
+              <img src="{{ url_for('uploaded_avatar', filename=comentario.autor.avatar_filename) }}"
+                   alt="{{ comentario.autor.iniciales }}">
+            {% else %}
+              {{ comentario.autor.iniciales }}
+            {% endif %}
+          </span>
+          <div class="comentario__cuerpo">
+            <div class="comentario__cabecera">
+              <a href="{{ url_for('perfil', username=comentario.autor.username) }}"
+                 class="comentario__autor">{{ comentario.autor.username }}</a>
+              {% if comentario.autor.es_admin %}
+                <span class="badge-admin">Admin</span>
+              {% endif %}
+              <time class="comentario__fecha"
+                    datetime="{{ comentario.fecha_creacion.isoformat() }}">
+                {{ comentario.fecha_creacion.strftime('%d %b %Y, %H:%M') }}
+              </time>
+            </div>
+            <p class="comentario__texto">{{ comentario.contenido }}</p>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="estado-vacio" style="padding:var(--s8)">
+      <span class="icono-vacio">💬</span>
+      <strong>Todavía no hay comentarios</strong>
+      <p>¡Sé el primero en opinar!</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

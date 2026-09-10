@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tarjeta_post with context %}
+
+{% block titulo %}{{ usuario.username }} · Perfil · TriumHive{% endblock %}
+
+{% block contenido %}
+<!-- Cabecera de perfil -->
+<div class="cabecera-perfil">
+  <div class="cabecera-perfil__banner"></div>
+  <div class="cabecera-perfil__cuerpo">
+    <span class="avatar-grande">
+      {% if usuario.tiene_avatar %}
+        <img src="{{ url_for('uploaded_avatar', filename=usuario.avatar_filename) }}"
+             alt="Foto de perfil de {{ usuario.username }}">
+      {% else %}
+        {{ usuario.iniciales }}
+      {% endif %}
+    </span>
+
+    <div class="cabecera-perfil__info">
+      <h1>
+        {{ usuario.nombre_completo or usuario.username }}
+        {% if usuario.es_admin %} <span class="badge-admin">Admin</span>{% endif %}
+      </h1>
+      <p class="cabecera-perfil__sub">
+        @{{ usuario.username }}
+        {% if usuario.grado_seccion %} · {{ usuario.grado_seccion }}{% endif %}
+      </p>
+
+      <span class="cabecera-perfil__rango">
+        {{ usuario.rango_icono }} {{ usuario.rango }}
+      </span>
+
+      {% if usuario.bio %}
+        <p style="margin-top:var(--s3);font-size:var(--tam-sm);color:var(--color-texto-suave)">
+          {{ usuario.bio }}
+        </p>
+      {% endif %}
+
+      <div class="estadisticas-perfil" style="margin-top:var(--s4)">
+        <div>
+          <strong>{{ posts|length }}</strong>
+          <span>Publicaciones</span>
+        </div>
+        <div>
+          <strong>{{ usuario.prestige_points }}</strong>
+          <span>Pts. de prestigio</span>
+        </div>
+        <div>
+          <strong>{{ usuario.fecha_registro.strftime('%b %Y') }}</strong>
+          <span>Miembro desde</span>
+        </div>
+      </div>
+    </div>
+
+    {% if current_user.is_authenticated and (current_user.username == usuario.username or current_user.es_admin) %}
+      <div class="cabecera-perfil__acciones">
+        <a href="{{ url_for('editar_perfil', username=usuario.username) }}"
+           class="boton boton-fantasma">✏️ Editar perfil</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Publicaciones -->
+<div style="margin-bottom:var(--s4)">
+  <h2 style="font-size:var(--tam-lg);margin:0">
+    Publicaciones de {{ usuario.username }}
+  </h2>
+</div>
+
+{% if posts %}
+  <div class="lista-posts">
+    {% for post in posts %}
+      {{ tarjeta_post(post) }}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="estado-vacio">
+    <span class="icono-vacio">📭</span>
+    <strong>{{ usuario.username }} todavía no ha publicado nada</strong>
+    {% if current_user.is_authenticated and current_user.username == usuario.username %}
+      <p>¡Crea tu primera publicación y comparte algo con la comunidad!</p>
+      <a href="{{ url_for('crear_post') }}" class="boton boton-acento">✏️ Publicar ahora</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Error {{ codigo }} · TriumHive{% endblock %}
+
+{% block contenido %}
+<div class="pagina-error">
+  <p class="codigo">{{ codigo }}</p>
+  <h2>{{ mensaje }}</h2>
+  <a href="{{ url_for('index') }}" class="boton boton-primario" style="margin-top:var(--s6)">
+    ← Volver al inicio
+  </a>
+</div>
+{% endblock %}

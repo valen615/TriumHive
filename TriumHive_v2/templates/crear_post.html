@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block titulo %}Nueva publicación · TriumHive{% endblock %}
+
+{% block contenido %}
+<div class="tarjeta-formulario">
+  <div class="tarjeta-formulario__cabecera">
+    <span class="icono-formulario">✏️</span>
+    <h1>Crear publicación</h1>
+    <p class="subtitulo">Comparte algo con la comunidad del {{ nombre_institucion }}.</p>
+  </div>
+
+  <form method="POST" action="{{ url_for('crear_post') }}"
+        enctype="multipart/form-data" novalidate>
+    {{ form.hidden_tag() }}
+
+    <div class="campo-formulario">
+      {{ form.titulo.label }}
+      {{ form.titulo(placeholder="Un título claro y directo", class="") }}
+      {% for error in form.titulo.errors %}
+        <div class="error-campo">⚠ {{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="campo-formulario">
+      {{ form.categoria_id.label }}
+      {{ form.categoria_id() }}
+      {% for error in form.categoria_id.errors %}
+        <div class="error-campo">⚠ {{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="campo-formulario">
+      {{ form.contenido.label }}
+      {{ form.contenido(placeholder="Escribe el contenido de tu publicación… Sé claro, respetuoso y constructivo.") }}
+      {% for error in form.contenido.errors %}
+        <div class="error-campo">⚠ {{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <!-- Zona de adjuntos -->
+    <div class="campo-formulario">
+      <label>📎 Fotos o archivos <span style="font-weight:400;color:var(--color-texto-suave)">(opcional, hasta 5)</span></label>
+      <div class="zona-upload" id="zona-upload">
+        <input type="file" name="adjuntos" multiple
+               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.xlsx,.txt,.zip"
+               id="input-adjuntos">
+        <span class="zona-upload__icono">📁</span>
+        <p class="zona-upload__texto">Arrastra archivos aquí o haz clic para seleccionar</p>
+        <p class="zona-upload__subtext">Imágenes (JPG, PNG, GIF, WEBP), PDF, Word, Excel, TXT, ZIP · Máx. 10 MB por archivo</p>
+      </div>
+      <div class="previsualizacion-archivos" id="preview-archivos"></div>
+    </div>
+
+    <button type="submit" class="boton boton-acento boton-ancho-completo">
+      🚀 Publicar ahora
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block js_extra %}
+<script src="{{ url_for('static', filename='js/upload_preview.js') }}"></script>
+{% endblock %}

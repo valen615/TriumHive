@@ -1,3 +1,5 @@
+from extensions import db
+
 """
 app.py
 ------
@@ -45,6 +47,21 @@ def create_app(config_name=None):
     login_manager.init_app(app)
     csrf.init_app(app)
     migrate.init_app(app, db)
+
+    # --- CREAR TABLAS Y SEMILLA DE CATEGORÍAS AUTOMÁTICAMENTE ---
+    with app.app_context():
+        db.create_all()
+        from models import Category
+        if not Category.query.first():
+            categorias_iniciales = [
+                {"nombre": "Académico", "slug": "academico", "icono": "📚", "color": "#14213D"},
+                {"nombre": "Eventos", "slug": "eventos", "icono": "🎉", "color": "#E8A33D"},
+                {"nombre": "Deportes", "slug": "deportes", "icono": "🏆", "color": "#2E8B77"},
+                {"nombre": "Off-Topic", "slug": "off-topic", "icono": "💬", "color": "#8C5AA8"},
+            ]
+            for cat_data in categorias_iniciales:
+                db.session.add(Category(**cat_data))
+            db.session.commit()
 
     # --- Variables globales disponibles en todas las plantillas Jinja2 ---
     @app.context_processor
@@ -381,4 +398,9 @@ if __name__ == "__main__":
 
         db.session.commit()
 
+
     app.run(debug=True)
+
+
+with app.app_context():
+    db.create_all()

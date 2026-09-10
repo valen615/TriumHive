@@ -54,7 +54,7 @@ def create_app(config_name=None):
     app = Flask(__name__, instance_relative_config=True)
 
     config_name = config_name or os.environ.get("FLASK_ENV", "development")
-    app.config.from_object(config_by_name.get(config_name, "development"))
+    app.config.from_object(config_by_name.get(config_name, config_by_name["development"]))
 
     os.makedirs(app.instance_path, exist_ok=True)
 
@@ -72,10 +72,15 @@ def create_app(config_name=None):
     csrf.init_app(app)
     migrate.init_app(app, db)
 
+    # Inicializar base de datos y categorías predeterminadas al arrancar la app
+    with app.app_context():
+        db.create_all()
+        inicializar_categorias()
+
     @app.context_processor
     def inyectar_globales():
         return {
-            "nombre_institucion": app.config["NOMBRE_INSTITUCION"],
+            "nombre_institucion": app.config.get("NOMBRE_INSTITUCION", "Colegio Triumphare"),
             "categorias_nav": Category.query.order_by(Category.nombre.asc()).all(),
             "anio_actual": datetime.now().year,
         }
@@ -84,6 +89,33 @@ def create_app(config_name=None):
     registrar_manejadores_error(app)
 
     return app
+
+
+def inicializar_categorias():
+    categorias_base = [
+        {"nombre": "Información Real",  "slug": "info-real",   "icono": "📰", "color": "#1A2E6E",
+         "descripcion": "Noticias, anuncios oficiales y datos verificados del colegio."},
+        {"nombre": "Académico",          "slug": "academico",   "icono": "📚", "color": "#2563EB",
+         "descripcion": "Apuntes, dudas de clase, proyectos y recursos de estudio."},
+        {"nombre": "Eventos",            "slug": "eventos",     "icono": "🎉", "color": "#D97706",
+         "descripcion": "Actividades, ferias, aniversarios y novedades del colegio."},
+        {"nombre": "Deportes",           "slug": "deportes",    "icono": "🏆", "color": "#16A34A",
+         "descripcion": "Torneos, resultados y convocatorias deportivas."},
+        {"nombre": "Chismes",            "slug": "chismes",     "icono": "👀", "color": "#C8102E",
+         "descripcion": "Rumores y comentarios informales. ¡Solo por diversión!"},
+        {"nombre": "Off-Topic",          "slug": "off-topic",   "icono": "💬", "color": "#7C3AED",
+         "descripcion": "Charla libre entre estudiantes, fuera de temas académicos."},
+        {"nombre": "Arte & Creatividad", "slug": "arte",        "icono": "🎨", "color": "#DB2777",
+         "descripcion": "Obras, proyectos artísticos, música, fotografía y más."},
+        {"nombre": "Tecnología",         "slug": "tecnologia",  "icono": "💻", "color": "#0891B2",
+         "descripcion": "Proyectos tech, programación, gadgets y Triumphare Digital."},
+    ]
+
+    for datos in categorias_base:
+        if not Category.query.filter_by(slug=datos["slug"]).first():
+            db.session.add(Category(**datos))
+
+    db.session.commit()
 
 
 def registrar_rutas(app):
@@ -105,7 +137,7 @@ def registrar_rutas(app):
     @app.route("/")
     def index():
         pagina = request.args.get("pagina", 1, type=int)
-        por_pagina = app.config["POSTS_POR_PAGINA"]
+        por_pagina = app.config.get("POSTS_POR_PAGINA", 10)
 
         posts_recientes = (
             Post.query.order_by(Post.fijado.desc(), Post.fecha_creacion.desc())
@@ -129,7 +161,7 @@ def registrar_rutas(app):
     def explorar():
         categoria_slug = request.args.get("categoria", "todas")
         pagina = request.args.get("pagina", 1, type=int)
-        por_pagina = app.config["POSTS_POR_PAGINA"]
+        por_pagina = app.config.get("POSTS_POR_PAGINA", 10)
 
         query = Post.query.order_by(Post.fecha_creacion.desc())
 
@@ -248,9 +280,8 @@ def registrar_rutas(app):
                 autor_id=current_user.id,
             )
             db.session.add(post)
-            db.session.flush()  # necesitamos post.id antes de guardar adjuntos
+            db.session.flush()
 
-            # Procesar adjuntos
             archivos = request.files.getlist("adjuntos")
             conteo = 0
             for f in archivos:
@@ -301,7 +332,6 @@ def registrar_rutas(app):
             post.contenido = form.contenido.data.strip()
             post.categoria_id = form.categoria_id.data
 
-            # Nuevos adjuntos
             archivos = request.files.getlist("adjuntos")
             conteo_actual = post.adjuntos.count()
             for f in archivos:
@@ -332,7 +362,6 @@ def registrar_rutas(app):
         if post.autor_id != current_user.id and not current_user.es_admin:
             abort(403)
 
-        # Borrar archivos físicos
         for adj in post.adjuntos.all():
             ruta = os.path.join(app.config["UPLOAD_POSTS_DIR"], adj.filename)
             if os.path.exists(ruta):
@@ -445,7 +474,6 @@ def registrar_rutas(app):
             usuario.grado_seccion = (form.grado_seccion.data or "").strip() or None
             usuario.bio = (form.bio.data or "").strip() or None
 
-            # Foto de perfil
             if form.eliminar_avatar.data and usuario.avatar_filename:
                 ruta = os.path.join(app.config["UPLOAD_AVATARS_DIR"], usuario.avatar_filename)
                 if os.path.exists(ruta):
@@ -454,7 +482,6 @@ def registrar_rutas(app):
 
             avatar_file = form.avatar.data
             if avatar_file and avatar_file.filename:
-                # Borrar avatar anterior si existe
                 if usuario.avatar_filename:
                     ruta_ant = os.path.join(app.config["UPLOAD_AVATARS_DIR"], usuario.avatar_filename)
                     if os.path.exists(ruta_ant):
@@ -485,42 +512,5 @@ def registrar_manejadores_error(app):
 
 app = create_app()
 
-
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-
-        # Categorías mejoradas con todas las solicitadas
-        categorias_base = [
-            {"nombre": "Información Real",  "slug": "info-real",   "icono": "📰", "color": "#1A2E6E",
-             "descripcion": "Noticias, anuncios oficiales y datos verificados del colegio."},
-            {"nombre": "Académico",          "slug": "academico",   "icono": "📚", "color": "#2563EB",
-             "descripcion": "Apuntes, dudas de clase, proyectos y recursos de estudio."},
-            {"nombre": "Eventos",            "slug": "eventos",     "icono": "🎉", "color": "#D97706",
-             "descripcion": "Actividades, ferias, aniversarios y novedades del colegio."},
-            {"nombre": "Deportes",           "slug": "deportes",    "icono": "🏆", "color": "#16A34A",
-             "descripcion": "Torneos, resultados y convocatorias deportivas."},
-            {"nombre": "Chismes",            "slug": "chismes",     "icono": "👀", "color": "#C8102E",
-             "descripcion": "Rumores y comentarios informales. ¡Solo por diversión!"},
-            {"nombre": "Off-Topic",          "slug": "off-topic",   "icono": "💬", "color": "#7C3AED",
-             "descripcion": "Charla libre entre estudiantes, fuera de temas académicos."},
-            {"nombre": "Arte & Creatividad", "slug": "arte",        "icono": "🎨", "color": "#DB2777",
-             "descripcion": "Obras, proyectos artísticos, música, fotografía y más."},
-            {"nombre": "Tecnología",         "slug": "tecnologia",  "icono": "💻", "color": "#0891B2",
-             "descripcion": "Proyectos tech, programación, gadgets y Triumphare Digital."},
-        ]
-
-        for datos in categorias_base:
-            if not Category.query.filter_by(slug=datos["slug"]).first():
-                db.session.add(Category(**datos))
-
-        db.session.commit()
-
     app.run(debug=True)
-    
-from flask_migrate import Migrate
-
-migrate = Migrate(app, db)
-
-with app.app_context():
-    db.create_all()

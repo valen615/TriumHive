@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Nueva publicación · {{ nombre_institucion }}{% endblock %}
+
+{% block contenido %}
+  <div class="tarjeta-formulario">
+    <h1>Crear publicación</h1>
+    <p class="subtitulo">Comparte algo con la comunidad. Elige la categoría que mejor describa tu contenido.</p>
+
+    <form method="POST" action="{{ url_for('crear_post') }}" novalidate>
+      {{ form.hidden_tag() }}
+
+      <div class="campo-formulario">
+        {{ form.titulo.label }}
+        {{ form.titulo(placeholder="Un título claro y directo") }}
+        {% for error in form.titulo.errors %}<div class="error-campo">{{ error }}</div>{% endfor %}
+      </div>
+
+      <div class="campo-formulario">
+        {{ form.categoria_id.label }}
+        {{ form.categoria_id() }}
+        {% for error in form.categoria_id.errors %}<div class="error-campo">{{ error }}</div>{% endfor %}
+      </div>
+
+      <div class="campo-formulario">
+        {{ form.contenido.label }}
+        {{ form.contenido(placeholder="Escribe el contenido de tu publicación…") }}
+        {% for error in form.contenido.errors %}<div class="error-campo">{{ error }}</div>{% endfor %}
+      </div>
+
+      <button type="submit" class="boton boton-primario boton-ancho-completo">Publicar</button>
+    </form>
+  </div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{# =====================================================================
+   _macros.html — TriumHive
+   Macros reutilizables: tarjeta de post, paginación.
+   ===================================================================== #}
+
+{% macro tarjeta_post(post) %}
+<article class="tarjeta-post" style="--color-categoria: {{ post.categoria.color }};">
+  <div class="tarjeta-post__franja"></div>
+
+  {# Imagen de portada si hay adjunto de imagen #}
+  {% set img = post.imagen_principal %}
+  {% if img %}
+    <a href="{{ url_for('post_detalle', post_id=post.id) }}" tabindex="-1">
+      <img class="tarjeta-post__imagen"
+           src="{{ url_for('uploaded_post_file', filename=img.filename) }}"
+           alt="Imagen de portada de {{ post.titulo }}"
+           loading="lazy">
+    </a>
+  {% endif %}
+
+  <div class="tarjeta-post__cuerpo">
+    <div class="tarjeta-post__meta">
+      <span class="etiqueta-categoria">{{ post.categoria.icono }} {{ post.categoria.nombre }}</span>
+      {% if post.fijado %}
+        <span class="tarjeta-post__fijado">📌 Fijado</span>
+      {% endif %}
+      <time datetime="{{ post.fecha_creacion.isoformat() }}">
+        {{ post.fecha_creacion.strftime('%d %b %Y') }}
+      </time>
+    </div>
+
+    <h3><a href="{{ url_for('post_detalle', post_id=post.id) }}">{{ post.titulo }}</a></h3>
+    <p class="tarjeta-post__resumen">{{ post.resumen }}</p>
+
+    {# Mini-chips de adjuntos no-imagen #}
+    {% set archivos = post.adjuntos.filter_by(es_imagen=False).all() %}
+    {% if archivos %}
+      <div class="tarjeta-adjuntos">
+        {% for adj in archivos %}
+          <span class="chip-adjunto">📎 {{ adj.original_name or adj.filename }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="tarjeta-post__pie">
+      <a href="{{ url_for('perfil', username=post.autor.username) }}" class="tarjeta-post__autor">
+        <span class="avatar-inicial">
+          {% if post.autor.tiene_avatar %}
+            <img src="{{ url_for('uploaded_avatar', filename=post.autor.avatar_filename) }}"
+                 alt="{{ post.autor.iniciales }}">
+          {% else %}
+            {{ post.autor.iniciales }}
+          {% endif %}
+        </span>
+        <span>
+          {{ post.autor.username }}
+          {% if post.autor.es_admin %}<span class="badge-admin">Admin</span>{% endif %}
+        </span>
+      </a>
+
+      <div class="tarjeta-post__acciones">
+        <button
+          type="button"
+          class="boton-like {% if post.ha_dado_like(current_user) %}esta-activo{% endif %}"
+          data-post-id="{{ post.id }}"
+          {% if not current_user.is_authenticated %}
+            data-requiere-login="true" data-login-url="{{ url_for('login') }}"
+          {% endif %}
+          aria-label="{% if post.ha_dado_like(current_user) %}Quitar me gusta{% else %}Dar me gusta{% endif %}"
+        >
+          <span class="icono-corazon">♥</span>
+          <span class="contador-likes">{{ post.total_likes }}</span>
+        </button>
+        <a href="{{ url_for('post_detalle', post_id=post.id) }}#comentarios"
+           style="color:inherit; display:flex; align-items:center; gap:4px; font-size:0.875rem;">
+          💬 {{ post.total_comentarios }}
+        </a>
+      </div>
+    </div>
+  </div>
+</article>
+{% endmacro %}
+
+
+{# =====================================================================
+   Macro de paginación genérica.
+   ===================================================================== #}
+{% macro paginacion(pag, endpoint) %}
+{% if pag.pages > 1 %}
+<nav class="paginacion" aria-label="Paginación">
+  {% if pag.has_prev %}
+    <a href="{{ url_for(endpoint, pagina=pag.prev_num, **kwargs) }}" aria-label="Página anterior">‹</a>
+  {% else %}
+    <span class="deshabilitada" aria-hidden="true">‹</span>
+  {% endif %}
+
+  {% for num in pag.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+    {% if num %}
+      {% if num == pag.page %}
+        <span class="activa" aria-current="page">{{ num }}</span>
+      {% else %}
+        <a href="{{ url_for(endpoint, pagina=num, **kwargs) }}">{{ num }}</a>
+      {% endif %}
+    {% else %}
+      <span aria-hidden="true">…</span>
+    {% endif %}
+  {% endfor %}
+
+  {% if pag.has_next %}
+    <a href="{{ url_for(endpoint, pagina=pag.next_num, **kwargs) }}" aria-label="Página siguiente">›</a>
+  {% else %}
+    <span class="deshabilitada" aria-hidden="true">›</span>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
